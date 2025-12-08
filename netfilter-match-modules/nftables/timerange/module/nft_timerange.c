@@ -55,6 +55,10 @@ static const struct nla_policy nft_timerange_policy[NFTA_TIMERANGE_MAX + 1] = {
 	[NFTA_TIMERANGE_WEEKLYRANGES]	= { .type = NLA_STRING, .len = TIMERANGE_TEXT_SIZE },
 };
 
+static char** split_on_separators(char* line_str, char* separators, int num_separators, int max_pieces, int include_remainder_at_max);
+static char* trim_flanking_whitespace(char* str);
+
+
 static bool timerange_mt(struct nft_timerange_info *priv, struct sk_buff *skb)
 {
 	ktime_t stamp_time;
@@ -460,7 +464,7 @@ void to_lowercase(char* str)
  * result is dynamically allocated, MUST be freed after call-- even if 
  * line is empty (you still get a valid char** pointer to to a NULL char*)
  */
-char** split_on_separators(char* line_str, char* separators, int num_separators, int max_pieces, int include_remainder_at_max)
+static char** split_on_separators(char* line_str, char* separators, int num_separators, int max_pieces, int include_remainder_at_max)
 {
 	char** split;
 
@@ -575,7 +579,7 @@ char** split_on_separators(char* line_str, char* separators, int num_separators,
 	return split;
 }
 
-char* trim_flanking_whitespace(char* str)
+static char* trim_flanking_whitespace(char* str)
 {
 	int new_start = 0;
 	int new_length = 0;
@@ -729,7 +733,7 @@ PARSE_OUT:
 	return (valid_arg ? 0 : -EINVAL);
 }
 
-static int nft_timerange_dump(struct sk_buff *skb, const struct nft_expr *expr)
+static int nft_timerange_dump(struct sk_buff *skb, const struct nft_expr *expr, bool reset)
 {
 	const struct nft_timerange_info *priv = nft_expr_priv(expr);
 	int i;

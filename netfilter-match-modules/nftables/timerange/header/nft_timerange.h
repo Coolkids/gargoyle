@@ -56,6 +56,4 @@ long* parse_weekdays(char* wd_str);
 long* parse_time_ranges(char* time_ranges, unsigned char is_weekly_range);
 void merge_adjacent_time_ranges(long* time_ranges, unsigned char is_weekly_range);
 unsigned long parse_time(char* time_str);
-char** split_on_separators(char* line_str, char* separators, int num_separators, int max_pieces, int include_remainder_at_max);
-char* trim_flanking_whitespace(char* str);
 #endif /*_NFT_TIMERANGE_MT_H*/

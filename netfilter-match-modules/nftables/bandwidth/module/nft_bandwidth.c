@@ -60,7 +60,7 @@ static ktime_t last_local_mw_update;
 
 
 static spinlock_t bandwidth_lock = __SPIN_LOCK_UNLOCKED(bandwidth_lock);
-DEFINE_SEMAPHORE(userspace_lock);
+DEFINE_SEMAPHORE(userspace_lock, 1);
 
 static string_map* id_map = NULL;
 
@@ -187,6 +187,10 @@ static void do_print_buf(void)
 	reset_buf();
 }
 */
+
+static char* trim_flanking_whitespace(char* str);
+static char** split_on_separators(char* line, char* separators, int num_separators, int max_pieces, int include_remainder_at_max, unsigned long *num_pieces);
+static void parse_ips_and_ranges(char* addr_str, struct nft_bandwidth_info *priv);
 
 #define BANDWIDTH_SUBNET_STR_SIZE 128
 static const struct nla_policy nft_bandwidth_policy[NFTA_BANDWIDTH_MAX + 1] = {
@@ -2643,7 +2647,7 @@ static void* pton_guess_family(char* ipstr, int* family)
  * result is dynamically allocated, MUST be freed after call-- even if 
  * line is empty (you still get a valid char** pointer to to a NULL char*)
  */
-char** split_on_separators(char* line, char* separators, int num_separators, int max_pieces, int include_remainder_at_max, unsigned long *num_pieces)
+static char** split_on_separators(char* line, char* separators, int num_separators, int max_pieces, int include_remainder_at_max, unsigned long *num_pieces)
 {
 	char** split;
 	
@@ -2762,7 +2766,7 @@ char** split_on_separators(char* line, char* separators, int num_separators, int
 	return split;
 }
 
-char* trim_flanking_whitespace(char* str)
+static char* trim_flanking_whitespace(char* str)
 {
 	int new_start = 0;
 	int new_length = 0;
@@ -2813,7 +2817,7 @@ char* trim_flanking_whitespace(char* str)
 	return str;
 }
 
-void parse_ips_and_ranges(char* addr_str, struct nft_bandwidth_info *priv)
+static void parse_ips_and_ranges(char* addr_str, struct nft_bandwidth_info *priv)
 {
 	int family = 0;
 	unsigned long num_pieces;
@@ -3180,7 +3184,7 @@ static int nft_bandwidth_init(const struct nft_ctx *ctx, const struct nft_expr *
 	return (valid_arg ? 0 : -EINVAL);
 }
 
-static int nft_bandwidth_dump(struct sk_buff *skb, const struct nft_expr *expr) {
+static int nft_bandwidth_dump(struct sk_buff *skb, const struct nft_expr *expr, bool reset) {
 	const struct nft_bandwidth_info *rule_priv = nft_expr_priv(expr);
 	struct nft_bandwidth_info *priv = rule_priv->non_const_self;
 	int retval = 0;

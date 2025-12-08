@@ -100,7 +100,7 @@ void* remove_long_map_element(long_map* map, unsigned long key);
 unsigned long* get_sorted_long_map_keys(long_map* map, unsigned long* num_keys_returned);
 void** get_sorted_long_map_values(long_map* map, unsigned long* num_values_returned);
 void** destroy_long_map(long_map* map, int destruction_type, unsigned long* num_destroyed);
-void apply_to_every_long_map_value(long_map* map, void (*apply_func)(unsigned long key, void* value));
+static inline void apply_to_every_long_map_value(long_map* map, void (*apply_func)(unsigned long key, void* value));
 
 /* string map functions */
 string_map* initialize_string_map(unsigned char store_keys);
@@ -110,7 +110,7 @@ void* remove_string_map_element(string_map* map, const char* key);
 char** get_string_map_keys(string_map* map, unsigned long* num_keys_returned); 
 void** get_string_map_values(string_map* map, unsigned long* num_values_returned);
 void** destroy_string_map(string_map* map, int destruction_type, unsigned long* num_destroyed);
-void apply_to_every_string_map_value(string_map* map, void (*apply_func)(char* key, void* value));
+static inline void apply_to_every_string_map_value(string_map* map, void (*apply_func)(char* key, void* value));
 
 
 /*
@@ -167,9 +167,9 @@ static unsigned long sdbm_string_hash(const char *key);
  * For testing only
  ***************************************************/
 /*
-void print_list(stack_node *l);
+static inline void print_list(stack_node *l);
 
-void print_list(stack_node *l)
+static inline void print_list(stack_node *l)
 {
 	if(l != NULL)
 	{
@@ -813,11 +813,11 @@ void** destroy_long_map(long_map* map, int destruction_type, unsigned long* num_
 
 
 
-void apply_to_every_long_map_value(long_map* map, void (*apply_func)(unsigned long key, void* value))
+static inline void apply_to_every_long_map_value(long_map* map, void (*apply_func)(unsigned long key, void* value))
 {
 	apply_to_every_long_map_node(map->root, apply_func);
 }
-void apply_to_every_string_map_value(string_map* map, void (*apply_func)(char* key, void* value))
+static inline void apply_to_every_string_map_value(string_map* map, void (*apply_func)(char* key, void* value))
 {
 	apply_to_every_string_map_node( (map->lm).root, map->store_keys, apply_func);
 }
