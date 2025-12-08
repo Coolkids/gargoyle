@@ -1,4 +1,7 @@
 
+#include <time.h>
+#include <sys/time.h>
+#define xfree(p) do { if (p) { free(p); (p) = NULL; } } while(0)
 static void weburl_stmt_print(const struct stmt *stmt, struct output_ctx *octx)
 {
 	bool inv = stmt->weburl.flags & NFT_WEBURL_F_INV;
