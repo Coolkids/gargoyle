@@ -188,10 +188,6 @@ static void do_print_buf(void)
 }
 */
 
-static char* trim_flanking_whitespace(char* str);
-static char** split_on_separators(char* line, char* separators, int num_separators, int max_pieces, int include_remainder_at_max, unsigned long *num_pieces);
-static void parse_ips_and_ranges(char* addr_str, struct nft_bandwidth_info *priv);
-
 #define BANDWIDTH_SUBNET_STR_SIZE 128
 static const struct nla_policy nft_bandwidth_policy[NFTA_BANDWIDTH_MAX + 1] = {
 	[NFTA_BANDWIDTH_ID]			        = { .type = NLA_STRING, .len = BANDWIDTH_MAX_ID_LENGTH },
@@ -2647,7 +2643,7 @@ static void* pton_guess_family(char* ipstr, int* family)
  * result is dynamically allocated, MUST be freed after call-- even if 
  * line is empty (you still get a valid char** pointer to to a NULL char*)
  */
-static char** split_on_separators(char* line, char* separators, int num_separators, int max_pieces, int include_remainder_at_max, unsigned long *num_pieces)
+char** split_on_separators(char* line, char* separators, int num_separators, int max_pieces, int include_remainder_at_max, unsigned long *num_pieces)
 {
 	char** split;
 	
@@ -2766,7 +2762,7 @@ static char** split_on_separators(char* line, char* separators, int num_separato
 	return split;
 }
 
-static char* trim_flanking_whitespace(char* str)
+char* trim_flanking_whitespace(char* str)
 {
 	int new_start = 0;
 	int new_length = 0;
@@ -2817,7 +2813,7 @@ static char* trim_flanking_whitespace(char* str)
 	return str;
 }
 
-static void parse_ips_and_ranges(char* addr_str, struct nft_bandwidth_info *priv)
+void parse_ips_and_ranges(char* addr_str, struct nft_bandwidth_info *priv)
 {
 	int family = 0;
 	unsigned long num_pieces;

@@ -89,29 +89,29 @@ typedef struct
 
 
 /* long map functions */
-static long_map* initialize_long_map(void);
-static void* get_long_map_element(long_map* map, unsigned long key);
-static void* get_smallest_long_map_element(long_map* map, unsigned long* smallest_key);
-static void* get_largest_long_map_element(long_map* map, unsigned long* largest_key);
-static void* remove_smallest_long_map_element(long_map* map, unsigned long* smallest_key);
-static void* remove_largest_long_map_element(long_map* map, unsigned long* largest_key);
-static void* set_long_map_element(long_map* map, unsigned long key, void* value);
-static void* remove_long_map_element(long_map* map, unsigned long key);
-static unsigned long* get_sorted_long_map_keys(long_map* map, unsigned long* num_keys_returned);
-static void** get_sorted_long_map_values(long_map* map, unsigned long* num_values_returned);
-static void** destroy_long_map(long_map* map, int destruction_type, unsigned long* num_destroyed);
-static void apply_to_every_long_map_value(long_map* map, void (*apply_func)(unsigned long key, void* value));
+long_map* initialize_long_map(void);
+void* get_long_map_element(long_map* map, unsigned long key);
+void* get_smallest_long_map_element(long_map* map, unsigned long* smallest_key);
+void* get_largest_long_map_element(long_map* map, unsigned long* largest_key);
+void* remove_smallest_long_map_element(long_map* map, unsigned long* smallest_key);
+void* remove_largest_long_map_element(long_map* map, unsigned long* largest_key);
+void* set_long_map_element(long_map* map, unsigned long key, void* value);
+void* remove_long_map_element(long_map* map, unsigned long key);
+unsigned long* get_sorted_long_map_keys(long_map* map, unsigned long* num_keys_returned);
+void** get_sorted_long_map_values(long_map* map, unsigned long* num_values_returned);
+void** destroy_long_map(long_map* map, int destruction_type, unsigned long* num_destroyed);
+void apply_to_every_long_map_value(long_map* map, void (*apply_func)(unsigned long key, void* value));
 
 /* string map functions */
-static string_map* initialize_string_map(unsigned char store_keys);
-static void* get_string_map_element(string_map* map, const char* key);
-static void* get_string_map_element_with_hashed_key(string_map* map, unsigned long hashed_key);
-static void* set_string_map_element(string_map* map, const char* key, void* value);
-static void* remove_string_map_element(string_map* map, const char* key);
-static char** get_string_map_keys(string_map* map, unsigned long* num_keys_returned); 
-static void** get_string_map_values(string_map* map, unsigned long* num_values_returned);
-static void** destroy_string_map(string_map* map, int destruction_type, unsigned long* num_destroyed);
-static void apply_to_every_string_map_value(string_map* map, void (*apply_func)(char* key, void* value));
+string_map* initialize_string_map(unsigned char store_keys);
+void* get_string_map_element(string_map* map, const char* key);
+void* get_string_map_element_with_hashed_key(string_map* map, unsigned long hashed_key);
+void* set_string_map_element(string_map* map, const char* key, void* value);
+void* remove_string_map_element(string_map* map, const char* key);
+char** get_string_map_keys(string_map* map, unsigned long* num_keys_returned); 
+void** get_string_map_values(string_map* map, unsigned long* num_values_returned);
+void** destroy_string_map(string_map* map, int destruction_type, unsigned long* num_destroyed);
+void apply_to_every_string_map_value(string_map* map, void (*apply_func)(char* key, void* value));
 
 
 /*
@@ -190,7 +190,7 @@ void print_list(stack_node *l)
  * string_map function definitions
  ***************************************************/
 
-static string_map* initialize_string_map(unsigned char store_keys)
+string_map* initialize_string_map(unsigned char store_keys)
 {
 	string_map* map = (string_map*)malloc(sizeof(string_map));
 	if(map != NULL)
@@ -203,14 +203,14 @@ static string_map* initialize_string_map(unsigned char store_keys)
 	return map;
 }
 
-static void* get_string_map_element(string_map* map, const char* key)
+void* get_string_map_element(string_map* map, const char* key)
 {
 	unsigned long hashed_key = sdbm_string_hash(key);
 
 	return get_string_map_element_with_hashed_key(map, hashed_key);
 }
 
-static void* get_string_map_element_with_hashed_key(string_map* map, unsigned long hashed_key)
+void* get_string_map_element_with_hashed_key(string_map* map, unsigned long hashed_key)
 {
 	void* return_value;
 	/* printk("doing lookup for key = %lu\n", hashed_key); */
@@ -224,7 +224,7 @@ static void* get_string_map_element_with_hashed_key(string_map* map, unsigned lo
 	return return_value;
 }
 
-static void* set_string_map_element(string_map* map, const char* key, void* value)
+void* set_string_map_element(string_map* map, const char* key, void* value)
 {
 	unsigned long hashed_key = sdbm_string_hash(key);
 	void* return_value = NULL;
@@ -259,7 +259,7 @@ static void* set_string_map_element(string_map* map, const char* key, void* valu
 	return return_value;
 }
 
-static void* remove_string_map_element(string_map* map, const char* key)
+void* remove_string_map_element(string_map* map, const char* key)
 {
 	unsigned long hashed_key = sdbm_string_hash(key);
 	void* return_value =  remove_long_map_element( &(map->lm), hashed_key);
@@ -275,7 +275,7 @@ static void* remove_string_map_element(string_map* map, const char* key)
 	return return_value;
 }
 
-static char** get_string_map_keys(string_map* map, unsigned long* num_keys_returned)
+char** get_string_map_keys(string_map* map, unsigned long* num_keys_returned)
 {
 	char** str_keys;
 	str_keys = (char**)malloc((map->num_elements+1)*sizeof(char*));
@@ -309,7 +309,7 @@ static char** get_string_map_keys(string_map* map, unsigned long* num_keys_retur
 }
 
 
-static void** get_string_map_values(string_map* map, unsigned long* num_values_returned)
+void** get_string_map_values(string_map* map, unsigned long* num_values_returned)
 {
 	void** values = NULL;
 	if(map != NULL)
@@ -320,7 +320,7 @@ static void** get_string_map_values(string_map* map, unsigned long* num_values_r
 }
 
 
-static void** destroy_string_map(string_map* map, int destruction_type, unsigned long* num_destroyed)
+void** destroy_string_map(string_map* map, int destruction_type, unsigned long* num_destroyed)
 {
 	void** return_values = NULL;
 	if(map != NULL)
@@ -370,7 +370,7 @@ static void** destroy_string_map(string_map* map, int destruction_type, unsigned
  * long_map function definitions
  ***************************************************/
 
-static long_map* initialize_long_map(void)
+long_map* initialize_long_map(void)
 {
 	long_map* map = (long_map*)malloc(sizeof(long_map));
 	if(map != NULL) /* test for malloc failure */
@@ -381,7 +381,7 @@ static long_map* initialize_long_map(void)
 	return map;
 }
 
-static void* get_long_map_element(long_map* map, unsigned long key)
+void* get_long_map_element(long_map* map, unsigned long key)
 {
 	void* value = NULL;
 
@@ -401,7 +401,7 @@ static void* get_long_map_element(long_map* map, unsigned long key)
 	return value;
 }
 
-static void* get_smallest_long_map_element(long_map* map, unsigned long* smallest_key)
+void* get_smallest_long_map_element(long_map* map, unsigned long* smallest_key)
 {
 	void* value = NULL;
 	if(map->root != NULL)
@@ -417,7 +417,7 @@ static void* get_smallest_long_map_element(long_map* map, unsigned long* smalles
 	return value;
 }
 
-static void* get_largest_long_map_element(long_map* map, unsigned long* largest_key)
+void* get_largest_long_map_element(long_map* map, unsigned long* largest_key)
 {
 	void* value = NULL;
 	if(map->root != NULL)
@@ -433,13 +433,13 @@ static void* get_largest_long_map_element(long_map* map, unsigned long* largest_
 	return value;
 }
 
-static void* remove_smallest_long_map_element(long_map* map, unsigned long* smallest_key)
+void* remove_smallest_long_map_element(long_map* map, unsigned long* smallest_key)
 {
 	get_smallest_long_map_element(map, smallest_key);
 	return remove_long_map_element(map, *smallest_key);
 }
 
-static void* remove_largest_long_map_element(long_map* map, unsigned long* largest_key)
+void* remove_largest_long_map_element(long_map* map, unsigned long* largest_key)
 {
 	get_largest_long_map_element(map, largest_key);
 	return remove_long_map_element(map, *largest_key);
@@ -447,7 +447,7 @@ static void* remove_largest_long_map_element(long_map* map, unsigned long* large
 
 
 /* if replacement performed, returns replaced value, otherwise null */
-static void* set_long_map_element(long_map* map, unsigned long key, void* value)
+void* set_long_map_element(long_map* map, unsigned long key, void* value)
 {
 	stack_node* parent_list = NULL;
 	void* old_value = NULL;
@@ -556,7 +556,7 @@ static void* set_long_map_element(long_map* map, unsigned long key, void* value)
 }
 
 
-static void* remove_long_map_element(long_map* map, unsigned long key)
+void* remove_long_map_element(long_map* map, unsigned long key)
 {
 
 	void* value = NULL;
@@ -774,7 +774,7 @@ static void* remove_long_map_element(long_map* map, unsigned long key)
 
 
 /* note: returned keys are dynamically allocated, you need to free them! */
-static unsigned long* get_sorted_long_map_keys(long_map* map, unsigned long* num_keys_returned)
+unsigned long* get_sorted_long_map_keys(long_map* map, unsigned long* num_keys_returned)
 {
 	unsigned long* key_list = (unsigned long*)malloc((map->num_elements)*sizeof(unsigned long));
 	unsigned long next_key_index;
@@ -792,7 +792,7 @@ static unsigned long* get_sorted_long_map_keys(long_map* map, unsigned long* num
 }
 
 
-static void** get_sorted_long_map_values(long_map* map, unsigned long* num_values_returned)
+void** get_sorted_long_map_values(long_map* map, unsigned long* num_values_returned)
 {
 	void** value_list = (void**)malloc((map->num_elements+1)*sizeof(void*));
 	unsigned long next_value_index;
@@ -813,7 +813,7 @@ static void** get_sorted_long_map_values(long_map* map, unsigned long* num_value
 
 
 
-static void** destroy_long_map(long_map* map, int destruction_type, unsigned long* num_destroyed)
+void** destroy_long_map(long_map* map, int destruction_type, unsigned long* num_destroyed)
 {
 	void** return_values = destroy_long_map_values(map, destruction_type, num_destroyed);
 	free(map);
@@ -822,11 +822,11 @@ static void** destroy_long_map(long_map* map, int destruction_type, unsigned lon
 
 
 
-static void apply_to_every_long_map_value(long_map* map, void (*apply_func)(unsigned long key, void* value))
+void apply_to_every_long_map_value(long_map* map, void (*apply_func)(unsigned long key, void* value))
 {
 	apply_to_every_long_map_node(map->root, apply_func);
 }
-static void apply_to_every_string_map_value(string_map* map, void (*apply_func)(char* key, void* value))
+void apply_to_every_string_map_value(string_map* map, void (*apply_func)(char* key, void* value))
 {
 	apply_to_every_string_map_node( (map->lm).root, map->store_keys, apply_func);
 }

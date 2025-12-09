@@ -102,12 +102,6 @@ static const struct nla_policy nft_webmon_policy[NFTA_WEBMON_MAX + 1] = {
 	[NFTA_WEBMON_SEARCHLOADDATALEN]	= { .type = NLA_U32 },
 };
 
-static char* trim_flanking_whitespace(char* str);
-static char** split_on_separators(char* line, char* separators, int num_separators, int max_pieces, int include_remainder_at_max, unsigned long *num_pieces);
-static void parse_ips_and_ranges(char* addr_str, struct nft_webmon_info *priv);
-static int strnicmp(const char * cs,const char * ct,size_t count);
-static char *strnistr(const char *s, const char *find, size_t slen);
-
 static void update_queue_node_time(queue_node* update_node, queue* full_queue)
 {
 	struct timespec64 t;
@@ -205,7 +199,7 @@ void destroy_queue(queue* q)
 	free(q);
 }
 
-static int strnicmp(const char * cs,const char * ct,size_t count)
+int strnicmp(const char * cs,const char * ct,size_t count)
 {
 	register signed char __res = 0;
 
@@ -220,7 +214,7 @@ static int strnicmp(const char * cs,const char * ct,size_t count)
 	return __res;
 }
 
-static char *strnistr(const char *s, const char *find, size_t slen)
+char *strnistr(const char *s, const char *find, size_t slen)
 {
 	char c, sc;
 	size_t len;
@@ -302,7 +296,7 @@ int within_edit_distance(char *s1, char *s2, int max_edit)
  * result is dynamically allocated, MUST be freed after call-- even if 
  * line is empty (you still get a valid char** pointer to to a NULL char*)
  */
-static char** split_on_separators(char* line, char* separators, int num_separators, int max_pieces, int include_remainder_at_max, unsigned long *num_pieces)
+char** split_on_separators(char* line, char* separators, int num_separators, int max_pieces, int include_remainder_at_max, unsigned long *num_pieces)
 {
 	char** split;
 	
@@ -421,7 +415,7 @@ static char** split_on_separators(char* line, char* separators, int num_separato
 	return split;
 }
 
-static char* trim_flanking_whitespace(char* str)
+char* trim_flanking_whitespace(char* str)
 {
 	int new_start = 0;
 	int new_length = 0;
@@ -1662,7 +1656,7 @@ static void* pton_guess_family(char* ipstr, int* family)
 	return buf;
 }
 
-static void parse_ips_and_ranges(char* addr_str, struct nft_webmon_info *priv)
+void parse_ips_and_ranges(char* addr_str, struct nft_webmon_info *priv)
 {
 	int family = 0;
 	int validip = 0;

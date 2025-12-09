@@ -58,7 +58,4 @@ struct nft_weburl_info
 	unsigned char match_part;
 	bool invert;
 };
-
-int strnicmp(const char * cs,const char * ct,size_t count);
-char *strnistr(const char *s, const char *find, size_t slen);
 #endif /*_NFT_WEBURL_H*/
