@@ -247,6 +247,12 @@ void* set_string_map_element(string_map* map, const char* key, void* value)
 		}
 		kv->value = value;
 		return_value = set_long_map_element(  &(map->lm), hashed_key, kv);
+		if(return_value == NULL && get_long_map_element(&(map->lm), hashed_key) != kv)
+		{
+			free(kv->key);
+			free(kv);
+			return NULL;
+		}
 		if(return_value != NULL)
 		{
 			string_map_key_value* r = (string_map_key_value*)return_value;

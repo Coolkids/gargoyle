@@ -59,6 +59,37 @@ nftables_module_dir="$module_dir/nftables"
 
 new_iptables_module_dirs=""
 new_nftables_module_dirs=""
+
+##先删除文件
+# 查找并删除文件
+echo "正在搜索文件: 608-add-kernel-gargoyle-netfilter-match-modules.patch"
+echo "搜索目录: $openwrt_buildroot_dir"
+echo
+
+# 使用find命令查找所有匹配的文件
+found_files=$(find "$openwrt_buildroot_dir" -type f -name "608-add-kernel-gargoyle-netfilter-match-modules.patch" 2>/dev/null)
+
+if [ -z "$found_files" ]; then
+    echo "未找到匹配的文件"
+else
+	# 显示找到的文件
+	echo "找到以下文件:"
+	echo "$found_files"
+	echo
+
+	# 删除文件
+	echo "正在删除文件..."
+	echo "$found_files" | while IFS= read -r file; do
+		if rm -v "$file"; then
+			echo "已成功删除: $file"
+		else
+			echo "删除失败: $file" >&2
+		fi
+	done
+fi
+
+echo "补丁前删除上次补丁操作完成"
+
 # IPTABLES
 new_module_list=$(ls "$iptables_module_dir" 2>/dev/null)
 for d in $new_module_list ; do
@@ -533,42 +564,11 @@ for new_d in $new_nftables_module_dirs ; do
 			done < "$new_d/libnftnl/meta"
 		fi
 
-		#modify libnftnl src/Makefile.in
-		insert_line_num=$(cat libnftnl.new/src/Makefile.in | egrep -n "am_libnftnl_la_OBJECTS = " | sed 's/:.*$//g' )
-		insert_line_num=$(($insert_line_num+3))
-		config_lines=$(printf "%s"  '	expr/'$lower_name'.lo \')
-		insert_lines_at "$insert_line_num" "$config_lines" "libnftnl.new/src/Makefile.in" "1"
-		
-		insert_line_num=$(cat libnftnl.new/src/Makefile.in | egrep -n "am__depfiles_remade = " | sed 's/:.*$//g' )
-		insert_line_num=$(($insert_line_num+7))
-		config_lines=$(printf "%s"  '	expr/$(DEPDIR)/'$lower_name'.Plo \')
-		insert_lines_at "$insert_line_num" "$config_lines" "libnftnl.new/src/Makefile.in" "1"
-		
-		insert_line_num=$(cat libnftnl.new/src/Makefile.in | egrep -n "libnftnl_la_SOURCES = " | sed 's/:.*$//g' )
-		insert_line_num=$(($insert_line_num+1))
+		#modify libnftnl src/Makefile.am
+		insert_line_num=$(cat libnftnl.new/src/Makefile.am | egrep -n "libnftnl_la_SOURCES = " | sed 's/:.*$//g' )
+		insert_line_num=$(($insert_line_num+2))
 		config_lines=$(printf "%s"  '	      expr/'$lower_name'.c \')
-		insert_lines_at "$insert_line_num" "$config_lines" "libnftnl.new/src/Makefile.in" "1"
-		
-		insert_line_num=$(cat libnftnl.new/src/Makefile.in | egrep -n "expr/xfrm\\.lo: expr/\\$\\(am__dirstamp\\) expr/\\$\\(DEPDIR\\)/\\$\\(am__dirstamp\\)" | sed 's/:.*$//g' )
-		insert_line_num=$(($insert_line_num+0))
-		config_lines=$(printf "%s\n"  "expr/$lower_name.lo: expr/\$(am__dirstamp) expr/\$(DEPDIR)/\$(am__dirstamp)")
-		insert_lines_at "$insert_line_num" "$config_lines" "libnftnl.new/src/Makefile.in" "1"
-		
-		insert_line_num=$(cat libnftnl.new/src/Makefile.in | egrep -n "@AMDEP_TRUE@@am__include@ @am__quote@expr/\\$\\(DEPDIR\\)/xfrm\\.Plo" | sed 's/:.*$//g' )
-		insert_line_num=$(($insert_line_num+0))
-		config_lines=$(printf "%s\n"  "@AMDEP_TRUE@@am__include@ @am__quote@expr/\$(DEPDIR)/$lower_name.Plo@am__quote@ # am--include-marker")
-		insert_lines_at "$insert_line_num" "$config_lines" "libnftnl.new/src/Makefile.in" "1"
-		
-		insert_line_num=$(cat libnftnl.new/src/Makefile.in | egrep -n "distclean:" | sed 's/:.*$//g' )
-		insert_line_num=$(($insert_line_num+1))
-		config_lines=$(printf "%s\n"  "	-rm -f expr/\$(DEPDIR)/$lower_name.Plo")
-		insert_lines_at "$insert_line_num" "$config_lines" "libnftnl.new/src/Makefile.in" "1"
-		
-		insert_line_num=$(cat libnftnl.new/src/Makefile.in | egrep -n "maintainer-clean:" | sed 's/:.*$//g' )
-		insert_line_num=$(($insert_line_num+1))
-		config_lines=$(printf "%s\n"  "	-rm -f expr/\$(DEPDIR)/$lower_name.Plo")
-		insert_lines_at "$insert_line_num" "$config_lines" "libnftnl.new/src/Makefile.in" "1"
-
+		insert_lines_at "$insert_line_num" "$config_lines" "libnftnl.new/src/Makefile.am" "1"
 
 		#update config templates -- just for simplicity do so for both 2.4-generic and 2.6-generic 
 		for config in $generic_config_file $config_file ; do
@@ -602,7 +602,7 @@ done
 
 if [ "$patch_kernel" = 1 ] ; then	
 	#build netfilter patch file
-	rm -rf $patch_dir/650-custom_netfilter_match_modules.patch 2>/dev/null
+	rm -rf $patch_dir/608-add-kernel-gargoyle-netfilter-match-modules.patch 2>/dev/null
 	cd linux.new
 	module_files=$(find net/netfilter)
 	include_files=$(find include/linux/netfilter)
@@ -611,15 +611,15 @@ if [ "$patch_kernel" = 1 ] ; then
 	for t in $test_files ; do
 		if [ ! -d "linux.new/$t" ] ; then
 			if [ -e "linux.orig/$t" ] ; then
-				diff -u "linux.orig/$t" "linux.new/$t" >> $patch_dir/650-custom_netfilter_match_modules.patch
+				diff -u "linux.orig/$t" "linux.new/$t" >> $patch_dir/608-add-kernel-gargoyle-netfilter-match-modules.patch
 			else
-				diff -u /dev/null "linux.new/$t" >> $patch_dir/650-custom_netfilter_match_modules.patch
+				diff -u /dev/null "linux.new/$t" >> $patch_dir/608-add-kernel-gargoyle-netfilter-match-modules.patch
 			fi	
 		fi
 	done
 
 	#build iptables patch file
-	rm -f ../package/iptables/patches/650-custom_netfilter_match_modules.patch 2>/dev/null
+	rm -f ../package/iptables/patches/608-add-kernel-gargoyle-netfilter-match-modules.patch 2>/dev/null
 	cd iptables.new
 	extension_files=$(find extensions)
 	include_files=$(find include/linux/netfilter)
@@ -627,15 +627,15 @@ if [ "$patch_kernel" = 1 ] ; then
 	for t in $extension_files $include_files ; do
 		if [ ! -d "iptables.new/$t" ] ; then
 			if [ -e "iptables.orig/$t" ] ; then
-				diff -u "iptables.orig/$t" "iptables.new/$t" >>$iptables_patch_dir/650-custom_netfilter_match_modules.patch
+				diff -u "iptables.orig/$t" "iptables.new/$t" >>$iptables_patch_dir/608-add-kernel-gargoyle-netfilter-match-modules.patch
 			else
-				diff -u /dev/null "iptables.new/$t" >>$iptables_patch_dir/650-custom_netfilter_match_modules.patch 
+				diff -u /dev/null "iptables.new/$t" >>$iptables_patch_dir/608-add-kernel-gargoyle-netfilter-match-modules.patch 
 			fi
 		fi	
 	done
 	
 	#build nftables patch file
-	rm -f ../package/nftables/patches/650-custom_netfilter_match_modules.patch 2>/dev/null
+	rm -f ../package/nftables/patches/608-add-kernel-gargoyle-netfilter-match-modules.patch 2>/dev/null
 	cd nftables.new
 	src_files=$(find src)
 	include_files=$(find include)
@@ -643,15 +643,15 @@ if [ "$patch_kernel" = 1 ] ; then
 	for t in $src_files $include_files ; do
 		if [ ! -d "nftables.new/$t" ] ; then
 			if [ -e "nftables.orig/$t" ] ; then
-				diff -u "nftables.orig/$t" "nftables.new/$t" >>$nftables_patch_dir/650-custom_netfilter_match_modules.patch
+				diff -u "nftables.orig/$t" "nftables.new/$t" >>$nftables_patch_dir/608-add-kernel-gargoyle-netfilter-match-modules.patch
 			else
-				diff -u /dev/null "nftables.new/$t" >>$nftables_patch_dir/650-custom_netfilter_match_modules.patch 
+				diff -u /dev/null "nftables.new/$t" >>$nftables_patch_dir/608-add-kernel-gargoyle-netfilter-match-modules.patch 
 			fi
 		fi
 	done
 	
 	#build libnftnl patch file
-	rm -f ../package/nftables/patches/650-custom_netfilter_match_modules.patch 2>/dev/null
+	rm -f ../package/nftables/patches/608-add-kernel-gargoyle-netfilter-match-modules.patch 2>/dev/null
 	cd libnftnl.new
 	src_files=$(find src)
 	include_files=$(find include)
@@ -659,9 +659,9 @@ if [ "$patch_kernel" = 1 ] ; then
 	for t in $src_files $include_files ; do
 		if [ ! -d "libnftnl.new/$t" ] ; then
 			if [ -e "libnftnl.orig/$t" ] ; then
-				diff -u "libnftnl.orig/$t" "libnftnl.new/$t" >>$libnftnl_patch_dir/650-custom_netfilter_match_modules.patch
+				diff -u "libnftnl.orig/$t" "libnftnl.new/$t" >>$libnftnl_patch_dir/608-add-kernel-gargoyle-netfilter-match-modules.patch
 			else
-				diff -u /dev/null "libnftnl.new/$t" >>$libnftnl_patch_dir/650-custom_netfilter_match_modules.patch 
+				diff -u /dev/null "libnftnl.new/$t" >>$libnftnl_patch_dir/608-add-kernel-gargoyle-netfilter-match-modules.patch 
 			fi
 		fi
 	done

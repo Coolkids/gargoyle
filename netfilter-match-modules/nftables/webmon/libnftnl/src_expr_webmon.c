@@ -100,6 +100,7 @@ static int nftnl_expr_webmon_set(struct nftnl_expr *e, uint16_t type,
 				 const void *data, uint32_t data_len)
 {
 	struct nftnl_expr_webmon *webmon = nftnl_expr_data(e);
+	char *new_value;
 	switch(type){
 	case NFTNL_EXPR_WEBMON_FLAGS:
 		memcpy(&webmon->flags, data, data_len);
@@ -111,19 +112,25 @@ static int nftnl_expr_webmon_set(struct nftnl_expr *e, uint16_t type,
 		memcpy(&webmon->max_searches, data, data_len);
 		break;
 	case NFTNL_EXPR_WEBMON_IPS:
-		webmon->ips = strdup(data);
-		if (!webmon->ips)
+		new_value = strdup(data);
+		if (!new_value)
 			return -1;
+		xfree(webmon->ips);
+		webmon->ips = new_value;
 		break;
 	case NFTNL_EXPR_WEBMON_DOMAINLOADFILE:
-		webmon->domain_load_file = strdup(data);
-		if (!webmon->domain_load_file)
+		new_value = strdup(data);
+		if (!new_value)
 			return -1;
+		xfree(webmon->domain_load_file);
+		webmon->domain_load_file = new_value;
 		break;
 	case NFTNL_EXPR_WEBMON_SEARCHLOADFILE:
-		webmon->search_load_file = strdup(data);
-		if (!webmon->search_load_file)
+		new_value = strdup(data);
+		if (!new_value)
 			return -1;
+		xfree(webmon->search_load_file);
+		webmon->search_load_file = new_value;
 		break;
 	}
 	return 0;

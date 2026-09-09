@@ -624,7 +624,7 @@ char* trim_flanking_whitespace(char* str)
 static int nft_timerange_init(const struct nft_ctx *ctx, const struct nft_expr *expr, const struct nlattr * const tb[])
 {
 	struct nft_timerange_info *priv = nft_expr_priv(expr);
-	char *hours, *weekdays, *weeklyranges;
+	char *hours = NULL, *weekdays = NULL, *weeklyranges = NULL;
 	bool invert = false;
 	int valid_arg = 0;
 	long* parsed = NULL;
@@ -637,13 +637,17 @@ static int nft_timerange_init(const struct nft_ctx *ctx, const struct nft_expr *
 	weekdays = kcalloc(TIMERANGE_TEXT_SIZE,sizeof(char),GFP_ATOMIC);
 	weeklyranges = kcalloc(TIMERANGE_TEXT_SIZE,sizeof(char),GFP_ATOMIC);
 	if (hours == NULL || weekdays == NULL || weeklyranges == NULL)
-		return -EINVAL;
-
+		goto PARSE_OUT;
 	if(tb[NFTA_TIMERANGE_FLAGS])
 	{
 		u32 flag = ntohl(nla_get_be32(tb[NFTA_TIMERANGE_FLAGS]));
 		if(flag & ~NFT_TIMERANGE_F_INV)
+		{
+			kfree(hours);
+			kfree(weekdays);
+			kfree(weeklyranges);
 			return -EOPNOTSUPP;
+		}
 
 		if(flag & NFT_TIMERANGE_F_INV)
 			invert = true;
@@ -671,6 +675,7 @@ static int nft_timerange_init(const struct nft_ctx *ctx, const struct nft_expr *
 			}
 			priv->ranges[range_index] = -1;
 			kfree(parsed);
+			parsed = NULL;
 
 
 			valid_arg = 1;
@@ -690,6 +695,7 @@ static int nft_timerange_init(const struct nft_ctx *ctx, const struct nft_expr *
 				priv->days[day_index] = parsed[day_index];
 			}
 			kfree(parsed);
+			parsed = NULL;
 
 			valid_arg = 1 ;
 			flags = flags + WEEKDAYS;
@@ -714,6 +720,7 @@ static int nft_timerange_init(const struct nft_ctx *ctx, const struct nft_expr *
 			}
 			priv->ranges[range_index] = -1;
 			kfree(parsed);
+			parsed = NULL;
 
 			valid_arg = 1;
 			flags = flags+WEEKLY_RANGE;
@@ -722,6 +729,7 @@ static int nft_timerange_init(const struct nft_ctx *ctx, const struct nft_expr *
 	}
 
 PARSE_OUT:
+	kfree(parsed);
 	kfree(hours);
 	kfree(weekdays);
 	kfree(weeklyranges);
@@ -741,6 +749,10 @@ static int nft_timerange_dump(struct sk_buff *skb, const struct nft_expr *expr, 
 	hours = kcalloc(TIMERANGE_TEXT_SIZE,sizeof(char),GFP_ATOMIC);
 	weekdays = kcalloc(TIMERANGE_TEXT_SIZE,sizeof(char),GFP_ATOMIC);
 	weeklyranges = kcalloc(TIMERANGE_TEXT_SIZE,sizeof(char),GFP_ATOMIC);
+	if (hours == NULL || weekdays == NULL || weeklyranges == NULL) {
+		retval = -ENOMEM;
+		goto DUMP_OUT;
+	}
 
 	switch(priv->type)
 	{

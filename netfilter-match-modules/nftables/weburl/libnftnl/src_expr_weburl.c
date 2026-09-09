@@ -23,14 +23,17 @@ static int nftnl_expr_weburl_set(struct nftnl_expr *e, uint16_t type,
 				 const void *data, uint32_t data_len)
 {
 	struct nftnl_expr_weburl *weburl = nftnl_expr_data(e);
+	char *new_value;
 	switch(type){
 	case NFTNL_EXPR_WEBURL_FLAGS:
 		memcpy(&weburl->flags, data, data_len);
 		break;
 	case NFTNL_EXPR_WEBURL_MATCH:
-		weburl->match = strdup(data);
-		if (!weburl->match)
+		new_value = strdup(data);
+		if (!new_value)
 			return -1;
+		xfree(weburl->match);
+		weburl->match = new_value;
 		break;
 	}
 	return 0;

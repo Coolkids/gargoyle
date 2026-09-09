@@ -1969,7 +1969,7 @@ static int nft_webmon_init(const struct nft_ctx *ctx, const struct nft_expr *exp
 
 	if(tb[NFTA_WEBMON_IPS] != NULL) nla_strscpy(ipstr, tb[NFTA_WEBMON_IPS], WEBMON_TEXT_SIZE);
 	if(strlen(ipstr) > 0 && mode == 0)
-		return -EINVAL;
+		goto PARSE_OUT;
 	
 	// Process IPs
 	priv->ips = kcalloc(WEBMON_MAX_IPS,sizeof(struct in_addr),GFP_ATOMIC);
@@ -1977,7 +1977,7 @@ static int nft_webmon_init(const struct nft_ctx *ctx, const struct nft_expr *exp
 	priv->ip6s = kcalloc(WEBMON_MAX_IPS,sizeof(struct in6_addr),GFP_ATOMIC);
 	priv->range6s = kcalloc(WEBMON_MAX_IP_RANGES,sizeof(struct nft_webmon_ip6_range),GFP_ATOMIC);
 	if(priv->ips == NULL || priv->ranges == NULL || priv->ip6s == NULL || priv->range6s == NULL)
-	    return -EINVAL;
+	    goto PARSE_OUT;
 	parse_ips_and_ranges(ipstr, priv);
 
 	if(tb[NFTA_WEBMON_MAXDOMAINS])
@@ -2028,24 +2028,62 @@ static int nft_webmon_init(const struct nft_ctx *ctx, const struct nft_expr *exp
        nft_webmon_clear_mapsqueues(WEBMON_SEARCH, max_domain);
    }
 
-   if(tb[NFTA_WEBMON_DOMAINLOADDATA] != NULL)
-   {
-       domain_load_data = kcalloc(WEBMON_DATA_SIZE,sizeof(char),GFP_ATOMIC);
-       nla_strscpy(domain_load_data, tb[NFTA_WEBMON_DOMAINLOADDATA], WEBMON_DATA_SIZE);
-       nft_webmon_load_mapsqueues(domain_load_data, ntohl(nla_get_be32(tb[NFTA_WEBMON_DOMAINLOADDATALEN])));
-       kfree(domain_load_data);
-   }
-   if(tb[NFTA_WEBMON_SEARCHLOADDATA] != NULL)
-   {
-       search_load_data = kcalloc(WEBMON_DATA_SIZE,sizeof(char),GFP_ATOMIC);
-       nla_strscpy(search_load_data, tb[NFTA_WEBMON_SEARCHLOADDATA], WEBMON_DATA_SIZE);
-       nft_webmon_load_mapsqueues(search_load_data, ntohl(nla_get_be32(tb[NFTA_WEBMON_SEARCHLOADDATALEN])));
-       kfree(search_load_data);
-   }
+	if(tb[NFTA_WEBMON_DOMAINLOADDATA] != NULL)
+	{
+	    domain_load_data = kcalloc(WEBMON_DATA_SIZE,sizeof(char),GFP_ATOMIC);
+	    if (domain_load_data == NULL)
+	    {
+			valid_arg = 0;
+			goto INIT_OUT;
+	    }
+	    nla_strscpy(domain_load_data, tb[NFTA_WEBMON_DOMAINLOADDATA], WEBMON_DATA_SIZE);
+	    nft_webmon_load_mapsqueues(domain_load_data, ntohl(nla_get_be32(tb[NFTA_WEBMON_DOMAINLOADDATALEN])));
+	    kfree(domain_load_data);
+	    domain_load_data = NULL;
+	}
+	if(tb[NFTA_WEBMON_SEARCHLOADDATA] != NULL)
+	{
+	    search_load_data = kcalloc(WEBMON_DATA_SIZE,sizeof(char),GFP_ATOMIC);
+	    if (search_load_data == NULL)
+	    {
+			valid_arg = 0;
+			goto INIT_OUT;
+	    }
+	    nla_strscpy(search_load_data, tb[NFTA_WEBMON_SEARCHLOADDATA], WEBMON_DATA_SIZE);
+	    nft_webmon_load_mapsqueues(search_load_data, ntohl(nla_get_be32(tb[NFTA_WEBMON_SEARCHLOADDATALEN])));
+	    kfree(search_load_data);
+	    search_load_data = NULL;
+	}
 
 	valid_arg = 1;
 
+INIT_OUT:
+	kfree(domain_load_data);
+	kfree(search_load_data);
+	if (!valid_arg && priv->ref_count != NULL)
+	{
+		spin_lock_bh(&webmon_lock);
+		*(priv->ref_count) = *(priv->ref_count) - 1;
+		if (*(priv->ref_count) == 0)
+		{
+			kfree(priv->ref_count);
+			ref_count = NULL;
+		}
+		priv->ref_count = NULL;
+		spin_unlock_bh(&webmon_lock);
+	}
 PARSE_OUT:
+	if (!valid_arg)
+	{
+		kfree(priv->ips);
+		kfree(priv->ranges);
+		kfree(priv->ip6s);
+		kfree(priv->range6s);
+		priv->ips = NULL;
+		priv->ranges = NULL;
+		priv->ip6s = NULL;
+		priv->range6s = NULL;
+	}
 	kfree(ipstr);
 
 	return (valid_arg ? 0 : -EINVAL);

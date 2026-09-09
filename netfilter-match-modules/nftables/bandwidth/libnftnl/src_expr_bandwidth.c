@@ -41,11 +41,14 @@ static int nftnl_expr_bandwidth_set(struct nftnl_expr *e, uint16_t type,
 				 const void *data, uint32_t data_len)
 {
 	struct nftnl_expr_bandwidth *bandwidth = nftnl_expr_data(e);
+	char *new_value;
 	switch(type){
 	case NFTNL_EXPR_BANDWIDTH_ID:
-		bandwidth->id = strdup(data);
-		if (!bandwidth->id)
+		new_value = strdup(data);
+		if (!new_value)
 			return -1;
+		xfree(bandwidth->id);
+		bandwidth->id = new_value;
 		break;
 	case NFTNL_EXPR_BANDWIDTH_CMP:
 		memcpy(&bandwidth->cmp, data, data_len);
@@ -63,14 +66,18 @@ static int nftnl_expr_bandwidth_set(struct nftnl_expr *e, uint16_t type,
 		memcpy(&bandwidth->current_bandwidth, data, data_len);
 		break;
 	case NFTNL_EXPR_BANDWIDTH_SUBNET:
-		bandwidth->subnet = strdup(data);
-		if (!bandwidth->subnet)
+		new_value = strdup(data);
+		if (!new_value)
 			return -1;
+		xfree(bandwidth->subnet);
+		bandwidth->subnet = new_value;
 		break;
 	case NFTNL_EXPR_BANDWIDTH_SUBNET6:
-		bandwidth->subnet6 = strdup(data);
-		if (!bandwidth->subnet6)
+		new_value = strdup(data);
+		if (!new_value)
 			return -1;
+		xfree(bandwidth->subnet6);
+		bandwidth->subnet6 = new_value;
 		break;
 	case NFTNL_EXPR_BANDWIDTH_RSTINTVL:
 		memcpy(&bandwidth->reset_interval, data, data_len);

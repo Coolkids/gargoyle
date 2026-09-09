@@ -277,8 +277,14 @@ regcomp(char *exp,int *patternsize)
 	g.regnpar = 1;
 	g.regcode = r->program;
 	regc(&g, MAGIC);
-	if (reg(&g, 0, &flags) == NULL)
+	if (reg(&g, 0, &flags) == NULL) {
+		#if __KERNEL__
+			kfree(r);
+		#else
+			free(r);
+		#endif
 		return(NULL);
+	}
 
 	/* Dig out information for optimizations. */
 	r->regstart = '\0';	/* Worst-case defaults. */
@@ -1215,5 +1221,4 @@ regprop(char *op)
 	return(buf);
 }
 #endif
-
 

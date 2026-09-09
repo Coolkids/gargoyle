@@ -2956,12 +2956,14 @@ static int nft_bandwidth_init(const struct nft_ctx *ctx, const struct nft_expr *
 		char* subnet = kcalloc(BANDWIDTH_SUBNET_STR_SIZE,sizeof(char),GFP_ATOMIC);
 		char* subnet6 = kcalloc(BANDWIDTH_SUBNET_STR_SIZE,sizeof(char),GFP_ATOMIC);
 		struct nft_bandwidth_info *master_priv = (struct nft_bandwidth_info*)kmalloc(sizeof(struct nft_bandwidth_info), GFP_ATOMIC);
+		info_and_maps *new_iam = NULL;
+		int init_ret = -ENOMEM;
 		priv->ref_count = (unsigned long*)kmalloc(sizeof(unsigned long), GFP_ATOMIC);
 
-		if(priv->ref_count == NULL || subnet == NULL || subnet6 == NULL) /* deal with kmalloc failure */
+		if(priv->ref_count == NULL || subnet == NULL || subnet6 == NULL || master_priv == NULL) /* deal with kmalloc failure */
 		{
 			printk("nft_bandwidth: kmalloc failure in nft_bandwidth_init!\n");
-			return -ENOMEM;
+			goto INIT_ERROR;
 		}
 		*(priv->ref_count) = 1;
 
@@ -3041,7 +3043,8 @@ static int nft_bandwidth_init(const struct nft_ctx *ctx, const struct nft_expr *
 					printk("nft_bandwidth: error, \"%s\" is a duplicate id in this IP family, OR, id referenced more than twice in INET\n", priv->id); 
 					spin_unlock_bh(&bandwidth_lock);
 					up(&userspace_lock);
-					return -EINVAL;
+					init_ret = -EINVAL;
+					goto INIT_ERROR;
 				}
 				
 				#ifdef BANDWIDTH_DEBUG
@@ -3062,7 +3065,8 @@ static int nft_bandwidth_init(const struct nft_ctx *ctx, const struct nft_expr *
 					printk("nft_bandwidth: error, \"%s\" is already used in the other IP family, but this rule is not substantially the same\n", priv->id); 
 					spin_unlock_bh(&bandwidth_lock);
 					up(&userspace_lock);
-					return -EINVAL;
+					init_ret = -EINVAL;
+					goto INIT_ERROR;
 				}
 				
 				iam->other_info = master_priv;
@@ -3078,15 +3082,19 @@ static int nft_bandwidth_init(const struct nft_ctx *ctx, const struct nft_expr *
 					printk("nft_bandwidth: kmalloc failure in nft_bandwidth_init!\n");
 					spin_unlock_bh(&bandwidth_lock);
 					up(&userspace_lock);
-					return -ENOMEM;
+					goto INIT_ERROR;
 				}
+				new_iam = iam;
+				iam->ip_map = NULL;
+				iam->ip_history_map = NULL;
+				iam->ip_family_map = NULL;
 				iam->ip_map = initialize_string_map(1);
 				if(iam->ip_map == NULL) /* handle kmalloc failure */
 				{
 					printk("nft_bandwidth: kmalloc failure in nft_bandwidth_init!\n");
 					spin_unlock_bh(&bandwidth_lock);
 					up(&userspace_lock);
-					return -ENOMEM;
+					goto INIT_ERROR;
 				}
 				iam->ip_history_map = NULL;
 				if(priv->num_intervals_to_save > 0)
@@ -3097,7 +3105,7 @@ static int nft_bandwidth_init(const struct nft_ctx *ctx, const struct nft_expr *
 						printk("nft_bandwidth: kmalloc failure in nft_bandwidth_init!\n");
 						spin_unlock_bh(&bandwidth_lock);
 						up(&userspace_lock);
-						return -ENOMEM;
+						goto INIT_ERROR;
 					}
 				}
 				iam->ip_family_map = initialize_string_map(1);
@@ -3106,11 +3114,19 @@ static int nft_bandwidth_init(const struct nft_ctx *ctx, const struct nft_expr *
 					printk("nft_bandwidth: kmalloc failure in nft_bandwidth_init!\n");
 					spin_unlock_bh(&bandwidth_lock);
 					up(&userspace_lock);
-					return -ENOMEM;
+					goto INIT_ERROR;
 				}
 				
 				iam->info = master_priv;
 				set_string_map_element(id_map, priv->id, iam);
+				if(get_string_map_element(id_map, priv->id) != iam)
+				{
+					printk("nft_bandwidth: unable to add id to map\n");
+					spin_unlock_bh(&bandwidth_lock);
+					up(&userspace_lock);
+					goto INIT_ERROR;
+				}
+				new_iam = NULL;
 				iam->info_family = family;
 				iam->other_info = NULL;
 				iam->other_info_family = 0;
@@ -3163,6 +3179,26 @@ static int nft_bandwidth_init(const struct nft_ctx *ctx, const struct nft_expr *
 		}
 		kfree(subnet);
 		kfree(subnet6);
+		goto INIT_DONE;
+
+INIT_ERROR:
+		if(new_iam != NULL)
+		{
+			unsigned long num_destroyed;
+			destroy_string_map(new_iam->ip_map, DESTROY_MODE_IGNORE_VALUES, &num_destroyed);
+			destroy_string_map(new_iam->ip_history_map, DESTROY_MODE_IGNORE_VALUES, &num_destroyed);
+			destroy_string_map(new_iam->ip_family_map, DESTROY_MODE_IGNORE_VALUES, &num_destroyed);
+			kfree(new_iam);
+		}
+		kfree(subnet);
+		kfree(subnet6);
+		kfree(priv->ref_count);
+		kfree(master_priv);
+		priv->ref_count = NULL;
+		priv->non_const_self = NULL;
+		return init_ret;
+INIT_DONE:
+		;
 	}
 	else
 	{
@@ -3202,18 +3238,24 @@ static int nft_bandwidth_dump(struct sk_buff *skb, const struct nft_expr *expr, 
 	const struct nft_bandwidth_info *rule_priv = nft_expr_priv(expr);
 	struct nft_bandwidth_info *priv = rule_priv->non_const_self;
 	int retval = 0;
-	char* subnetstr;
-	char* subnet6str;
-	struct in6_addr* subnettest;
+	char* subnetstr = NULL;
+	char* subnet6str = NULL;
+	struct in6_addr* subnettest = NULL;
 	int ret;
 
 	subnetstr = kcalloc(BANDWIDTH_SUBNET_STR_SIZE,sizeof(char),GFP_ATOMIC);
 	subnet6str = kcalloc(BANDWIDTH_SUBNET_STR_SIZE,sizeof(char),GFP_ATOMIC);
 	if (subnetstr == NULL || subnet6str == NULL)
-		return -1;
+	{
+		retval = -ENOMEM;
+		goto DUMP_OUT;
+	}
 	subnettest = kcalloc(1,sizeof(struct in6_addr),GFP_ATOMIC);
 	if (subnettest == NULL)
-		return -1;
+	{
+		retval = -ENOMEM;
+		goto DUMP_OUT;
+	}
 
 	if (nla_put_string(skb, NFTA_BANDWIDTH_ID, priv->id))
 	{
@@ -3283,6 +3325,7 @@ static int nft_bandwidth_dump(struct sk_buff *skb, const struct nft_expr *expr, 
 		retval = -1;
 	}
 
+DUMP_OUT:
 	kfree(subnetstr);
 	kfree(subnet6str);
 	kfree(subnettest);
@@ -3380,7 +3423,7 @@ static void nft_bandwidth_destroy(const struct nft_ctx *ctx, const struct nft_ex
 					histories_to_free = (bw_history**)destroy_string_map(iam->ip_history_map, DESTROY_MODE_RETURN_VALUES, &num_destroyed);
 					
 					/* num_destroyed will be 0 if histories_to_free is null after malloc failure, so this is safe */
-					for(history_index = 0; history_index < num_destroyed; history_index++) 
+					for(history_index = 0; histories_to_free != NULL && history_index < num_destroyed; history_index++)
 					{
 						bw_history* h = histories_to_free[history_index];
 						if(h != NULL)
@@ -3389,7 +3432,8 @@ static void nft_bandwidth_destroy(const struct nft_ctx *ctx, const struct nft_ex
 							kfree(h);
 						}
 					}
-					
+					kfree(histories_to_free);
+
 				}
 				else if(iam->ip_map != NULL && iam->ip_family_map != NULL)
 				{
@@ -3444,10 +3488,13 @@ static struct nft_expr_type nft_bandwidth_type __read_mostly =  {
 
 static int __init init(void)
 {
+	int ret;
 	/* Register setsockopt */
-	if (nf_register_sockopt(&nft_bandwidth_sockopts) < 0)
+	ret = nf_register_sockopt(&nft_bandwidth_sockopts);
+	if (ret < 0)
 	{
 		printk("nft_bandwidth: Can't register sockopts. Aborting\n");
+		return ret;
 	}
 	bandwidth_record_max = get_bw_record_max();
 	local_minutes_west = old_minutes_west = sys_tz.tz_minuteswest;
@@ -3464,10 +3511,19 @@ static int __init init(void)
 	if(id_map == NULL) /* deal with kmalloc failure */
 	{
 		printk("id map is null, returning -1\n");
-		return -1;
+		nf_unregister_sockopt(&nft_bandwidth_sockopts);
+		return -ENOMEM;
 	}
 
-	return nft_register_expr(&nft_bandwidth_type);
+	ret = nft_register_expr(&nft_bandwidth_type);
+	if (ret < 0)
+	{
+		unsigned long num_destroyed;
+		destroy_string_map(id_map, DESTROY_MODE_IGNORE_VALUES, &num_destroyed);
+		id_map = NULL;
+		nf_unregister_sockopt(&nft_bandwidth_sockopts);
+	}
+	return ret;
 }
 
 static void __exit fini(void)
@@ -3485,10 +3541,11 @@ static void __exit fini(void)
 			string_map* ip_map = iam->ip_map;
 			unsigned long num_destroyed;
 			destroy_string_map(ip_map, DESTROY_MODE_FREE_VALUES, &num_destroyed);
-			kfree(iam);
-			/* info portion of iam gets taken care of automatically */
+				kfree(iam);
+				/* info portion of iam gets taken care of automatically */
+			}
+			kfree(iams);
 		}
-	}
 	nf_unregister_sockopt(&nft_bandwidth_sockopts);
 	nft_unregister_expr(&nft_bandwidth_type);
 	spin_unlock_bh(&bandwidth_lock);

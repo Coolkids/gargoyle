@@ -50,8 +50,6 @@ MODULE_DESCRIPTION("Match URL in HTTP(S) requests, designed for use with Gargoyl
 MODULE_ALIAS("ipt_weburl");
 MODULE_ALIAS("ip6t_weburl");
 
-string_map* compiled_map = NULL;
-
 int strnicmp(const char * cs,const char * ct,size_t count)
 {
 	register signed char __res = 0;
@@ -113,16 +111,6 @@ int do_match_test(unsigned char match_type,  const char* reference, char* query)
 			break;
 		case WEBURL_REGEX_TYPE:
 
-			if(compiled_map == NULL)
-			{
-				compiled_map = initialize_map(0);
-				if(compiled_map == NULL) /* test for malloc failure */
-				{
-					return 0;
-				}
-			}
-			r = (struct regexp*)get_map_element(compiled_map, reference);
-			if(r == NULL)
 			{
 				int rlen = strlen(reference);
 				r= regcomp((char*)reference, &rlen);
@@ -130,9 +118,9 @@ int do_match_test(unsigned char match_type,  const char* reference, char* query)
 				{
 					return 0;
 				}
-				set_map_element(compiled_map, reference, (void*)r);
 			}
 			matches = regexec(r, query);
+			kfree(r);
 			break;
 		case WEBURL_EXACT_TYPE:
 			matches = (strstr(query, reference) != NULL) && strlen(query) == strlen(reference);
@@ -578,7 +566,6 @@ static struct xt_match xt_weburl_mt_reg[]  __read_mostly  =
 
 static int __init init(void)
 {
-	compiled_map = NULL;
 	return xt_register_matches(xt_weburl_mt_reg, ARRAY_SIZE(xt_weburl_mt_reg));
 
 }
@@ -586,13 +573,7 @@ static int __init init(void)
 static void __exit fini(void)
 {
 	xt_unregister_matches(xt_weburl_mt_reg, ARRAY_SIZE(xt_weburl_mt_reg));
-	if(compiled_map != NULL)
-	{
-		unsigned long num_destroyed;
-		destroy_map(compiled_map, DESTROY_MODE_FREE_VALUES, &num_destroyed);
-	}
 }
 
 module_init(init);
 module_exit(fini);
-

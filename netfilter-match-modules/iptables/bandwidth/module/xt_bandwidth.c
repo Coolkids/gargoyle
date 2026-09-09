@@ -2654,12 +2654,14 @@ static int checkentry(const struct xt_mtchk_param *par, int family)
 	if(info->ref_count == NULL) /* first instance, we're inserting rule */
 	{
 		struct xt_bandwidth_info *master_info = (struct xt_bandwidth_info*)kmalloc(sizeof(struct xt_bandwidth_info), GFP_ATOMIC);
+		info_and_maps *new_iam = NULL;
+		int init_ret = -ENOMEM;
 		info->ref_count = (unsigned long*)kmalloc(sizeof(unsigned long), GFP_ATOMIC);
 
-		if(info->ref_count == NULL) /* deal with kmalloc failure */
+		if(info->ref_count == NULL || master_info == NULL) /* deal with kmalloc failure */
 		{
 			printk("xt_bandwidth: kmalloc failure in checkentry!\n");
-			return -ENOMEM;
+			goto INIT_ERROR;
 		}
 		*(info->ref_count) = 1;
 		info->non_const_self = master_info;
@@ -2714,7 +2716,8 @@ static int checkentry(const struct xt_mtchk_param *par, int family)
 					printk("xt_bandwidth: error, \"%s\" is a duplicate id in this IP family\n", info->id); 
 					spin_unlock_bh(&bandwidth_lock);
 					up(&userspace_lock);
-					return -EINVAL;
+					init_ret = -EINVAL;
+					goto INIT_ERROR;
 				}
 				
 				#ifdef BANDWIDTH_DEBUG
@@ -2735,7 +2738,8 @@ static int checkentry(const struct xt_mtchk_param *par, int family)
 					printk("xt_bandwidth: error, \"%s\" is already used in the other IP family, but this rule is not substantially the same\n", info->id); 
 					spin_unlock_bh(&bandwidth_lock);
 					up(&userspace_lock);
-					return -EINVAL;
+					init_ret = -EINVAL;
+					goto INIT_ERROR;
 				}
 				
 				iam->other_info = master_info;
@@ -2750,15 +2754,19 @@ static int checkentry(const struct xt_mtchk_param *par, int family)
 					printk("xt_bandwidth: kmalloc failure in checkentry!\n");
 					spin_unlock_bh(&bandwidth_lock);
 					up(&userspace_lock);
-					return -ENOMEM;
+					goto INIT_ERROR;
 				}
+				new_iam = iam;
+				iam->ip_map = NULL;
+				iam->ip_history_map = NULL;
+				iam->ip_family_map = NULL;
 				iam->ip_map = initialize_string_map(1);
 				if(iam->ip_map == NULL) /* handle kmalloc failure */
 				{
 					printk("xt_bandwidth: kmalloc failure in checkentry!\n");
 					spin_unlock_bh(&bandwidth_lock);
 					up(&userspace_lock);
-					return -ENOMEM;
+					goto INIT_ERROR;
 				}
 				iam->ip_history_map = NULL;
 				if(info->num_intervals_to_save > 0)
@@ -2769,7 +2777,7 @@ static int checkentry(const struct xt_mtchk_param *par, int family)
 						printk("xt_bandwidth: kmalloc failure in checkentry!\n");
 						spin_unlock_bh(&bandwidth_lock);
 						up(&userspace_lock);
-						return -ENOMEM;
+						goto INIT_ERROR;
 					}
 				}
 				iam->ip_family_map = initialize_string_map(1);
@@ -2778,11 +2786,19 @@ static int checkentry(const struct xt_mtchk_param *par, int family)
 					printk("xt_bandwidth: kmalloc failure in checkentry!\n");
 					spin_unlock_bh(&bandwidth_lock);
 					up(&userspace_lock);
-					return -ENOMEM;
+					goto INIT_ERROR;
 				}
 				
 				iam->info = master_info;
 				set_string_map_element(id_map, info->id, iam);
+				if(get_string_map_element(id_map, info->id) != iam)
+				{
+					printk("xt_bandwidth: unable to add id to map\n");
+					spin_unlock_bh(&bandwidth_lock);
+					up(&userspace_lock);
+					goto INIT_ERROR;
+				}
+				new_iam = NULL;
 				iam->info_family = family;
 				iam->other_info = NULL;
 				iam->other_info_family = 0;
@@ -2833,6 +2849,24 @@ static int checkentry(const struct xt_mtchk_param *par, int family)
 			spin_unlock_bh(&bandwidth_lock);
 			up(&userspace_lock);
 		}
+		goto INIT_DONE;
+
+INIT_ERROR:
+		if(new_iam != NULL)
+		{
+			unsigned long num_destroyed;
+			destroy_string_map(new_iam->ip_map, DESTROY_MODE_IGNORE_VALUES, &num_destroyed);
+			destroy_string_map(new_iam->ip_history_map, DESTROY_MODE_IGNORE_VALUES, &num_destroyed);
+			destroy_string_map(new_iam->ip_family_map, DESTROY_MODE_IGNORE_VALUES, &num_destroyed);
+			kfree(new_iam);
+		}
+		kfree(info->ref_count);
+		kfree(master_info);
+		info->ref_count = NULL;
+		info->non_const_self = NULL;
+		return init_ret;
+INIT_DONE:
+		;
 	}
 	else
 	{
@@ -2969,7 +3003,7 @@ static void destroy(const struct xt_mtdtor_param *par, int family)
 					histories_to_free = (bw_history**)destroy_string_map(iam->ip_history_map, DESTROY_MODE_RETURN_VALUES, &num_destroyed);
 					
 					/* num_destroyed will be 0 if histories_to_free is null after malloc failure, so this is safe */
-					for(history_index = 0; history_index < num_destroyed; history_index++) 
+					for(history_index = 0; histories_to_free != NULL && history_index < num_destroyed; history_index++)
 					{
 						bw_history* h = histories_to_free[history_index];
 						if(h != NULL)
@@ -2978,6 +3012,7 @@ static void destroy(const struct xt_mtdtor_param *par, int family)
 							kfree(h);
 						}
 					}
+					kfree(histories_to_free);
 					
 				}
 				else if(iam->ip_map != NULL && iam->ip_family_map != NULL)
@@ -3049,10 +3084,13 @@ static struct xt_match bandwidth_mt_reg[] __read_mostly =
 
 static int __init init(void)
 {
+	int ret;
 	/* Register setsockopt */
-	if (nf_register_sockopt(&xt_bandwidth_sockopts) < 0)
+	ret = nf_register_sockopt(&xt_bandwidth_sockopts);
+	if (ret < 0)
 	{
 		printk("xt_bandwidth: Can't register sockopts. Aborting\n");
+		return ret;
 	}
 	bandwidth_record_max = get_bw_record_max();
 	local_minutes_west = old_minutes_west = sys_tz.tz_minuteswest;
@@ -3069,11 +3107,19 @@ static int __init init(void)
 	if(id_map == NULL) /* deal with kmalloc failure */
 	{
 		printk("id map is null, returning -1\n");
-		return -1;
+		nf_unregister_sockopt(&xt_bandwidth_sockopts);
+		return -ENOMEM;
 	}
 
-
-	return xt_register_matches(bandwidth_mt_reg, ARRAY_SIZE(bandwidth_mt_reg));
+	ret = xt_register_matches(bandwidth_mt_reg, ARRAY_SIZE(bandwidth_mt_reg));
+	if (ret < 0)
+	{
+		unsigned long num_destroyed;
+		destroy_string_map(id_map, DESTROY_MODE_IGNORE_VALUES, &num_destroyed);
+		id_map = NULL;
+		nf_unregister_sockopt(&xt_bandwidth_sockopts);
+	}
+	return ret;
 }
 
 static void __exit fini(void)
@@ -3094,6 +3140,7 @@ static void __exit fini(void)
 			kfree(iam);
 			/* info portion of iam gets taken care of automatically */
 		}
+		kfree(iams);
 	}
 	nf_unregister_sockopt(&xt_bandwidth_sockopts);
 	xt_unregister_matches(bandwidth_mt_reg, ARRAY_SIZE(bandwidth_mt_reg));

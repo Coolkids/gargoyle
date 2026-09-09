@@ -47,8 +47,6 @@ MODULE_AUTHOR("Michael Gray");
 MODULE_DESCRIPTION("Match URL in HTTP(S) requests, designed for use with Gargoyle web interface (www.gargoyle-router.com)");
 MODULE_ALIAS_NFT_EXPR("weburl");
 
-string_map* compiled_map = NULL;
-
 #define WEBURL_TEXT_SIZE MAX_TEST_STR
 static const struct nla_policy nft_weburl_policy[NFTA_WEBURL_MAX + 1] = {
 	[NFTA_WEBURL_FLAGS]			= { .type = NLA_U32 },
@@ -114,16 +112,6 @@ int do_match_test(unsigned char match_type, const char* reference, char* query)
 			break;
 		case WEBURL_REGEX_TYPE:
 
-			if(compiled_map == NULL)
-			{
-				compiled_map = initialize_map(0);
-				if(compiled_map == NULL) /* test for malloc failure */
-				{
-					return 0;
-				}
-			}
-			r = (struct regexp*)get_map_element(compiled_map, reference);
-			if(r == NULL)
 			{
 				int rlen = strlen(reference);
 				r= regcomp((char*)reference, &rlen);
@@ -131,9 +119,9 @@ int do_match_test(unsigned char match_type, const char* reference, char* query)
 				{
 					return 0;
 				}
-				set_map_element(compiled_map, reference, (void*)r);
 			}
 			matches = regexec(r, query);
+			kfree(r);
 			break;
 		case WEBURL_EXACT_TYPE:
 			matches = (strstr(query, reference) != NULL) && strlen(query) == strlen(reference);
@@ -688,18 +676,12 @@ static struct nft_expr_type nft_weburl_type __read_mostly =  {
 
 static int __init init(void)
 {
-	compiled_map = NULL;
 	return nft_register_expr(&nft_weburl_type);
 }
 
 static void __exit fini(void)
 {
 	nft_unregister_expr(&nft_weburl_type);
-	if(compiled_map != NULL)
-	{
-		unsigned long num_destroyed;
-		destroy_map(compiled_map, DESTROY_MODE_FREE_VALUES, &num_destroyed);
-	}
 }
 
 module_init(init);

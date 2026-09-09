@@ -28,24 +28,31 @@ static int nftnl_expr_timerange_set(struct nftnl_expr *e, uint16_t type,
 				 const void *data, uint32_t data_len)
 {
 	struct nftnl_expr_timerange *timerange = nftnl_expr_data(e);
+	char *new_value;
 	switch(type){
 	case NFTNL_EXPR_TIMERANGE_FLAGS:
 		memcpy(&timerange->flags, data, data_len);
 		break;
 	case NFTNL_EXPR_TIMERANGE_HOURS:
-		timerange->hours = strdup(data);
-		if (!timerange->hours)
+		new_value = strdup(data);
+		if (!new_value)
 			return -1;
+		xfree(timerange->hours);
+		timerange->hours = new_value;
 		break;
 	case NFTNL_EXPR_TIMERANGE_WEEKDAYS:
-		timerange->weekdays = strdup(data);
-		if (!timerange->weekdays)
+		new_value = strdup(data);
+		if (!new_value)
 			return -1;
+		xfree(timerange->weekdays);
+		timerange->weekdays = new_value;
 		break;
 	case NFTNL_EXPR_TIMERANGE_WEEKLYRANGES:
-		timerange->weeklyranges = strdup(data);
-		if (!timerange->weeklyranges)
+		new_value = strdup(data);
+		if (!new_value)
 			return -1;
+		xfree(timerange->weeklyranges);
+		timerange->weeklyranges = new_value;
 		break;
 	}
 	return 0;
