@@ -49,7 +49,7 @@ typedef union
 
 int get_minutes_west(void);
 void set_kernel_timezone(void);
-int parse_sub(char* subnet_string, ipany* subnet, ipany* subnet_mask, int family);
+int parse_sub(char* subnet_string, union xt_bandwidth_ipany* subnet, union xt_bandwidth_ipany* subnet_mask, int family);
 static void param_problem_exit_error(char* msg);
 char** split_on_separators(char* line, char* separators, int num_separators, int max_pieces, int include_remainder_at_max);
 char* trim_flanking_whitespace(char* str);
@@ -587,7 +587,7 @@ static void param_problem_exit_error(char* msg)
 	xtables_error(PARAMETER_PROBLEM, "%s", msg);
 }
 
-int parse_sub(char* subnet_string, ipany* subnet, ipany* subnet_mask, int family)
+int parse_sub(char* subnet_string, union xt_bandwidth_ipany* subnet, union xt_bandwidth_ipany* subnet_mask, int family)
 {
 	char** sub_parts = split_on_separators(subnet_string,"/",1,2,1);
 	char* substr = trim_flanking_whitespace(sub_parts[0]);
