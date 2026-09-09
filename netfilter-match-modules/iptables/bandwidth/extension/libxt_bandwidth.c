@@ -41,7 +41,11 @@
 #include <linux/netfilter.h>
 #include <linux/netfilter/xt_bandwidth.h>
 
-typedef union xt_bandwidth_ipany ipany;
+typedef union
+{
+	struct in_addr ip4;
+	struct in6_addr ip6;
+} ipany;
 
 int get_minutes_west(void);
 void set_kernel_timezone(void);

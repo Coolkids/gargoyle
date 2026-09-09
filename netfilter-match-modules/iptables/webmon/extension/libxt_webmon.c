@@ -24,7 +24,6 @@
 #include <netdb.h>
 #include <string.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <getopt.h>
 
 #include <arpa/inet.h>

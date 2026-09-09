@@ -5,7 +5,7 @@
  *
  *
  *  Copyright © 2009-2024 by Eric Bishop <eric@gargoyle-router.com>
- *  Rewritten for nftables by Michael Gray <support@lantisproject.com>
+ *  Rewritten for nftables 2025 by Michael Gray <support@lantisproject.com>
  *
  *  This file is free software: you may copy, redistribute and/or modify it
  *  under the terms of the GNU General Public License as published by the
@@ -2362,6 +2362,7 @@ static void set_single_ip_data(unsigned char history_included, info_and_maps* ia
 				}
 				else /* if this is most recent node, we still need to exit loop*/
 				{
+					node_index++;
 					break;
 				}
 				node_index++;
@@ -2555,7 +2556,7 @@ static int nft_bandwidth_set_ctl(struct sock *sk, int cmd, sockptr_t arg, u_int3
 	buffer_index = (3*4) + 1 + 1 + 8 + BANDWIDTH_MAX_ID_LENGTH;
 	next_ip_index = header.next_ip_index;
 	
-	while(next_ip_index < header.num_ips_in_buffer)
+	while(next_ip_index < (header.num_ips_in_buffer + header.next_ip_index))
 	{
 		set_single_ip_data(header.history_included, iam, buffer, &buffer_index, now);
 		next_ip_index++;

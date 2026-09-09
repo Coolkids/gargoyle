@@ -83,7 +83,7 @@ void regerror(char * s)
  */
 
 /* definition	number	opnd?	meaning */
-#define	END	0	/* no	End of program. */
+#define	P_END	0	/* no	End of program. */
 #define	BOL	1	/* no	Match "" at beginning of line. */
 #define	EOL	2	/* no	Match "" at end of line. */
 #define	ANY	3	/* no	Match any one character. */
@@ -162,6 +162,16 @@ void regerror(char * s)
 #define	WORST		0	/* Worst case. */
 
 /*
+ * Bound on match-time work: regmatch() visits at most this many program nodes
+ * per regexec() call before failing closed (returning "no match").  This caps
+ * the backtracking matcher so a pathological pattern -- e.g. (a|.)* or (.+)*
+ * against a crafted subject -- cannot spin for effectively unbounded CPU in
+ * softirq context.  The limit is generous relative to any legitimate URL and
+ * pattern; adjust if a real workload is ever found to approach it.
+ */
+#define	REGEXP_MAX_MATCH_STEPS	1000000UL
+
+/*
  * Global work variables for regcomp().
  */
 struct match_globals {
@@ -174,6 +184,7 @@ int regnpar;		/* () count. */
 char regdummy;
 char *regcode;		/* Code-emit pointer; &regdummy = don't. */
 long regsize;		/* Code size. */
+unsigned long steps;	/* regmatch() node-visit budget counter. */
 };
 
 /*
@@ -275,7 +286,7 @@ regcomp(char *exp,int *patternsize)
 	r->regmust = NULL;
 	r->regmlen = 0;
 	scan = r->program+1;			/* First BRANCH. */
-	if (OP(regnext(&g, scan)) == END) {		/* Only one top-level choice. */
+	if (OP(regnext(&g, scan)) == P_END) {		/* Only one top-level choice. */
 		scan = OPERAND(scan);
 
 		/* Starting-point info. */
@@ -361,7 +372,7 @@ reg(struct match_globals *g, int paren, int *flagp /* Parenthesized? */ )
 	}
 
 	/* Make a closing node, and hook it on the end. */
-	ender = regnode(g, (paren) ? CLOSE+parno : END);
+	ender = regnode(g, (paren) ? CLOSE+parno : P_END);
 	regtail(g, ret, ender);
 
 	/* Hook the tails of the branches to the closing node. */
@@ -754,6 +765,11 @@ regexec(regexp *prog, char *string)
 	/* Mark beginning of line for ^ . */
 	g.regbol = string;
 
+	/* Reset the match-cost budget for this call.  The counter lives across
+	 * every regtry() attempt below, so it bounds the total work spent on one
+	 * regexec(), not just a single anchor position. */
+	g.steps = 0;
+
 	/* Simplest case:  anchored match need be tried only once. */
 	if (prog->reganch)
 		return(regtry(&g, prog, string));
@@ -827,6 +843,12 @@ regmatch(struct match_globals *g, char *prog)
 		fprintf(stderr, "%s(\n", regprop(scan));
 #endif
 	while (scan != NULL) {
+		/* Charge one unit of the match-cost budget per node visited.  This
+		 * covers both the loop over "ordinary" nodes and every recursive
+		 * regmatch() call, so a pattern that backtracks catastrophically
+		 * fails closed here instead of running effectively forever. */
+		if (++g->steps > REGEXP_MAX_MATCH_STEPS)
+			return(0);
 #ifdef DEBUG
 		if (regnarrate)
 			fprintf(stderr, "%s...\n", regprop(scan));
@@ -978,7 +1000,7 @@ regmatch(struct match_globals *g, char *prog)
 				return(0);
 			}
 			break;
-		case END:
+		case P_END:
 			return(1);	/* Success! */
 			break;
 		default:
@@ -991,7 +1013,7 @@ regmatch(struct match_globals *g, char *prog)
 	}
 
 	/*
-	 * We get here only if there's trouble -- normally "case END" is
+	 * We get here only if there's trouble -- normally "case P_END" is
 	 * the terminating point.
 	 */
 	printk("<3>Regexp: corrupted pointers\n");
@@ -1075,13 +1097,13 @@ void
 regdump(regexp *r)
 {
 	register char *s;
-	register char op = EXACTLY;	/* Arbitrary non-END op. */
+	register char op = EXACTLY;	/* Arbitrary non-P_END op. */
 	register char *next;
 	/* extern char *strchr(); */
 
 
 	s = r->program + 1;
-	while (op != END) {	/* While that wasn't END last time... */
+	while (op != P_END) {	/* While that wasn't P_END last time... */
 		op = OP(s);
 		printf("%2d%s", s-r->program, regprop(s));	/* Where, what. */
 		next = regnext(s);
@@ -1151,7 +1173,7 @@ regprop(char *op)
 	case BACK:
 		p = "BACK";
 		break;
-	case END:
+	case P_END:
 		p = "END";
 		break;
 	case OPEN+1:
